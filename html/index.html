@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+            <title>
+                新冠肺炎全球实时数据
+            </title>
+            <!-- 引入 echarts.js -->
+            <script src="../static/js/echarts.min.js">
+            </script>
+            <script src="../static/js/jquery-3.5.1.min.js" type="text/javascript"></script>
+            <script src="../static/js/echarts-gl.min.js"></script>
+            <script type="text/javascript">
+                //----------------------刷新图表数据的函数 Start------------------------------
+                function refreshCanvas(data) {//刷新画布
+                    $('#main').css("height",data + "px");
+                    myChart.resize();
+                }
+
+                function refreshxAxisData(data){//刷新x轴数据
+                    let option = myChart.getOption();
+                    option.series[0].data = data;
+                    myChart.setOption(option);
+                }
+
+                function refreshyAxisData(data){//刷新y轴数据
+                    let option = myChart.getOption();
+                    option.yAxis[0].data = data;
+                    myChart.setOption(option);
+                }
+
+                function refreshTitleTextData(data){//刷新标题
+                    let option = myChart.getOption();
+                    option.title[0].text = data;
+                    myChart.setOption(option);
+                }
+
+                function refreshSubtextData(data){//刷新副标题（时间）
+                    let option = myChart.getOption();
+                    dataStr = "该图数据为" + data + "的数据    注：数据为0的国家未标注在图上";
+                    option.title[0].subtext = dataStr;
+                    myChart.setOption(option);
+                }
+
+                function refreshLegendData(data){//刷新图注的数据（其实是刷新series的name）
+                    let option = myChart.getOption();
+                    option.series[0].name = data;
+                    myChart.setOption(option);
+                }
+
+                function refresh3DTitleTextData(titleText){//刷新三维图的标题（h3标签）
+                    $("#3DTitle").text(titleText);
+                }
+
+                function refresh3DData(data){//刷新三维图的data
+                    let option = myChart2.getOption();
+                    //console.log(option);
+                    option.series[0].data = data;
+                    myChart2.setOption(option);
+                }
+
+                function refresh3DzAxisMaxData(data){//刷新z轴最大值数据
+                    let option = myChart2.getOption();
+                    //console.log(option);
+                    option.zAxis3D[0].max = data;
+                    myChart2.setOption(option);
+                }
+
+                function refresh3DvisualMapData(data){//刷新visualMap
+                    let option = myChart2.getOption();
+                    console.log(data);
+                    option.visualMap[0].pieces = [
+                        {
+                            gte: parseInt(data/5)*4,
+                            label: (parseInt(data/5)*4).toString()+'人以上',
+                            color: '#a50026'
+                        },
+                        {
+                            gte: parseInt(data/5)*3,
+                            lte: parseInt(data/5)*4-1,
+                            label: (parseInt(data/5)*3).toString()+'-'+(parseInt(data/5)*4-1).toString()+'人',
+                            color: '#FF4500'
+                        },
+                        {
+                            gte: parseInt(data/5)*2,
+                            lte: parseInt(data/5)*3-1,
+                            label: (parseInt(data/5)*2).toString()+'-'+(parseInt(data/5)*3-1).toString()+'人',
+                            color: '#f46d43'
+                        },
+                        {
+                            gte: parseInt(data/5),
+                            lte: parseInt(data/5)*2-1,
+                            label: (parseInt(data/5)).toString()+'-'+(parseInt(data/5)*2-1).toString()+'人',
+                            color: '#313695'
+                        },
+                        {
+                            lte: parseInt(data/5),
+                            label: '1-'+(parseInt(data/5)).toString()+'人',
+                            color: '#74add1'
+                        }
+                    ];
+                    myChart2.setOption(option);
+                }
+                //------------------------刷新图表数据的函数 End-----------------------------
+
+                //--------------------各种数据类型的Ajax请求 Start---------------------------
+                let countryName = [];
+                let newAdd = [];
+                let countNum = [];
+                let time;
+                let nowType = '';//记录当前显示的内容
+                let nowTypeStr = '';
+                let top10 = 0;
+                let sumCountry = 0;//记录国家总数
+                let isDelTop10 = true;//标记top10的下拉框是不是“--请选择--”已经被删除了
+                let isDelAll = true;  //标记all的下拉框是不是“--请选择--”已经被删除了
+
+                //封装Ajax请求各种类型数据的所有数据的函数
+                //type1表示显示top10数据还是所有数据 0-top10 1-全部
+                function getAllDataByAjax(type){
+                    let options,val,text;
+                    if(type == 0){
+                        //选择了top10的下拉框之后 就删除“--请选择--”这个option
+                        if(!isDelTop10){
+                            $("#select_top10 option[value='null']").remove();
+                            isDelTop10 = true;
+                        }
+                        //选择了top10的下拉框之后 就给all下拉框添加“--请选择--”这个option，并选中
+                        if(isDelAll){
+                            $("#select_all").prepend("<option value='null'>--请选择--</option>"); //为Select插入一个Option
+                            $("#select_all").val('null');
+                            isDelAll = false;
+                        }
+                        options = $("#select_top10 option:selected");
+                    }
+                    else{
+                        //选择了all的下拉框之后 就删除“--请选择--”这个option
+                        if(!isDelAll){
+                            $("#select_all option[value='null']").remove();
+                            isDelAll = true;
+                        }
+                        //选择了all的下拉框之后 就给top10下拉框添加“--请选择--”这个option，并选中
+                        if(isDelTop10){
+                            $("#select_top10").prepend("<option value='null'>--请选择--</option>"); //为Select插入一个Option
+                            $("#select_top10").val('null');
+                            isDelTop10 = false;
+                        }
+                        options = $("#select_all option:selected");
+                    }
+                    val = options.val();
+                    text = options.text();
+                    //ajax请求后台接口获取数据并修改echarts
+                    $.ajax({
+                        type: "GET",
+                        url: "http://epidemic.magicy.fun/" + val + "?date="+ $("#dateSelectTool").val(),
+                        dataType: "jsonp",
+                        jsonp: "jsonpCallback",//服务端用于接收callback调用的function名的参数
+                        success: function(epidemicData){
+                            //console.log("执行了ajax");
+                            sumCountry = 0;
+                            countryName = [];
+                            dataNum = [];
+                            nowTime = '';
+                            //console.log(epidemicData);
+                            //循环jsonData，将所有国家push到countryName数据中
+                            for(let countryNameTemp in epidemicData){
+                                if(epidemicData[countryNameTemp] != 0){
+                                    if(countryNameTemp != "time"){
+                                        sumCountry++;
+                                        countryName.push(countryNameTemp);
+                                        dataNum.push(epidemicData[countryNameTemp]);
+                                    }else{
+                                        nowTime = epidemicData[countryNameTemp];
+                                    }
+                                }
+                            }
+                            //alert(uri)
+                            nowType = val;
+                            nowTypeStr = text;
+                            top10 = type;
+                            if(top10 == 0){
+                                dataNum = dataNum.slice(-10);
+                                //console.log(dataNum);
+                                countryName = countryName.slice(-10);
+                                //console.log(countryName);
+                                sumCountry = 15;
+                                titleShow = "新冠肺炎"+nowTypeStr+"患者全球Top10国家实时数据"
+                            }else{
+                                titleShow = "新冠肺炎各国"+nowTypeStr+"患者实时数据"
+                            }
+                            myChart.showLoading();
+                            refreshTitleTextData(titleShow);
+                            refreshSubtextData(nowTime);//刷新副标题截止时间
+                            refreshLegendData(nowTypeStr+'患者人数');//刷新图注数据
+                            refreshxAxisData(dataNum);//刷新x轴
+                            refreshyAxisData(countryName);//刷新y轴
+                            refreshCanvas(sumCountry * 25);//刷新画布
+                            myChart.hideLoading();
+                        }
+                    });
+                }
+                //---------------------各种数据类型的Ajax请求 End---------------------------
+
+                //------------------------为三维图准备数据 Start----------------------------
+                function get3DDataByAjax(){
+                    let val = $('#select_3D option:selected').val();
+                    let str = $('#select_3D option:selected').text();
+                    let max = 0; //记录z轴最大值
+                    //console.log(str);
+                    //ajax请求后台接口获取数据并修改echarts-gl
+                    $.ajax({
+                        type: "GET",
+                        url: "http://epidemic.magicy.fun/" + val,
+                        dataType: "jsonp",
+                        jsonp: "jsonpCallback",//服务端用于接收callback调用的function名的参数
+                        success: function(epidemicData){
+                            //console.log("执行了ajax");
+                            //console.log(epidemicData);
+                            let data = [];
+                            let countryName;
+                            let dateTemp;
+                            let dataNum;
+                            //循环jsonData
+                            for(let countryTempData in epidemicData){
+                                countryName = countryTempData;
+                                for(let tempData in epidemicData[countryTempData]){
+                                    dateTemp = tempData;
+                                    dataNum = epidemicData[countryTempData][tempData];
+                                    if(dataNum > max)
+                                        max = dataNum;
+                                    data.push([countryName,dateTemp,dataNum]);
+                                }
+                                //data.push(tempDataList);
+                                //console.log(epidemicData[countryTempData]);
+                            }
+                            titleShow = "新冠肺炎"+str+"患者全球Top7国家近7日三维图";
+                            myChart2.showLoading();
+                            refresh3DTitleTextData(titleShow);
+                            //console.log(data);
+                            refresh3DData(data);//刷新data
+                            refresh3DvisualMapData(max);
+                            //console.log(max);
+                            refresh3DzAxisMaxData(max);//刷新z轴最大值
+                            myChart2.hideLoading();
+                        }
+                    });
+                }
+                //-------------------------为三维图准备数据 End-----------------------------
+
+                //----------设置日期选择器max值（今天之后日期不可选） Start-------------------
+                //该函数代码非原创
+                //参考https://blog.csdn.net/qq_41402200/article/details/80849331
+                function handleDatePicker(){
+                    //得到当前时间
+                    let date_now = new Date();
+                    //得到当前年份
+                    let year = date_now.getFullYear();
+                    //得到当前月份
+                    //注：
+                    //  1：js中获取Date中的month时，会比当前月份少一个月，所以这里需要先加一
+                    //  2: 判断当前月份是否小于10，如果小于，那么就在月份的前面加一个 '0' ， 如果大于，就显示当前月份
+                    let month = date_now.getMonth()+1 < 10 ? "0"+(date_now.getMonth()+1) : (date_now.getMonth()+1);
+                    //得到当前日子（多少号）
+                    let date = date_now.getDate() < 10 ? "0"+date_now.getDate() : date_now.getDate();
+                    //设置input标签的max属性
+                    //alert(year+"-"+month+"-"+date);
+                    //$("#dateSelectTool").attr("max",year+"-"+month+"-"+date);
+                    //设置input便签的默认选中的值
+                    $("#dateSelectTool").attr("value",year+"-"+month+"-"+date);
+                    //alert($("#dateSelectTool").val())
+                }
+                //------------设置日期选择器max值（今天之后日期不可选） End---------------------
+
+                //----------------监控日期选择框的变化进行Ajax请求 Start-------------------------
+                function dateChangeFun(){
+                    //获取当前两个select的值 哪个不是null就执行哪个
+                    if($("#select_top10").val() == 'null')
+                        getAllDataByAjax(1);
+                    else
+                        getAllDataByAjax(0);
+                }
+                //------------------监控日期选择框的变化进行Ajax请求 End--------------------------
+
+                //------------------定时任务 以及加载页面后马上请求 Start-----------------------
+                function onloadFun(){
+                    handleDatePicker();
+                    getAllDataByAjax(0);
+                    get3DDataByAjax();
+                }
+                //进入页面 立即发送一次ajax请求
+                //window.οnlοad=onloadFun();
+                $(document).ready(function(){
+                    onloadFun();
+                });
+                //定时发ajax请求
+                window.setInterval(function(){getAllDataByAjax(top10);},60000);
+                //------------------定时任务 以及加载页面后马上请求 End--------------------------
+            </script>
+    </head>
+    <body>
+        <div style="width:80%;margin: auto auto 20px auto">
+            <h1 style="text-align: center;color: OrangeRed">新冠肺炎全球实时数据</h1>
+            <h2 style="text-align: right;color: DimGray">Made by MagicYang</h2>
+            请选择要查询数据的日期:
+            <input type = 'date' id="dateSelectTool" min="2020-06-15" max="2020-06-21" onchange="dateChangeFun();"/>
+            <br><br>
+            查看
+            <select id="select_top10" onchange="getAllDataByAjax(0)">
+                <option value="addNum" selected>新增</option>
+                <option value="countNum">累积</option>
+                <option value="cureNum">已治愈</option>
+                <option value="deathNum">死亡</option>
+            </select>
+            患者人数Top10国家
+            <br><br>
+            查看各国
+            <select id="select_all" onchange="getAllDataByAjax(1)">
+                <option value="addNum">新增</option>
+                <option value="countNum">累积</option>
+                <option value="cureNum">已治愈</option>
+                <option value="deathNum">死亡</option>
+            </select>
+            患者人数图
+            <br><br>
+        </div>
+
+        <hr/>
+
+        <!-- 为ECharts准备一个具备大小（宽高）的Dom 显示二维图表-->
+        <div id="main" style="width: 100%;margin: 20px auto auto auto">
+        </div>
+        <script type="text/javascript">
+        // 基于准备好的dom，初始化echarts实例
+        let myChart = echarts.init(document.getElementById('main'));
+        myChart.showLoading();
+        // 指定图表的配置项和数据
+        let option = {
+            title: {
+                left: '20%',
+                subtext: '',
+                text: '',
+                subtextStyle: {
+                    color: 'Gray',
+                }
+            },
+            tooltip: {},
+            toolbox: {
+                show: true,
+                orient: 'vertical',
+                top: '15%',
+                left: '92%',
+                feature: {
+                    mark: {
+                        show: true
+                    },
+                    dataView: {
+                        show: true,
+                        readOnly: false
+                    },
+                    magicType: {
+                        show: true,
+                        type: ['line', 'bar', 'stack', 'tiled']},
+                    restore: {
+                        show: true
+                    },
+                    saveAsImage: {
+                        show: true
+                    }
+                }
+            },
+            legend: {
+                left: "80%",
+            },
+            xAxis: {
+                type: "value",
+                name:"人数/人",
+                data: [],
+            },
+            yAxis: {
+                type: "category",
+                data: [],
+                axisLabel: {
+                    interval: 0,
+                }
+            },
+            series: [{
+                name: '',
+                type: 'bar',
+                barWidth: 20,
+                data: [],
+                color: 'LightSkyBlue',
+                itemStyle: {
+                    normal:{
+                        label:{
+                            show: true,
+                            position: 'right',
+                            textStyle: {
+                                color: 'IndianRed',
+                                fontSize: 12
+                            }
+                        }
+                    }
+                }
+            }]
+        };
+
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(option);
+        myChart.hideLoading();
+        </script>
+
+        <hr>
+        <h3 id="3DTitle" style="margin:20px;text-align: center"></h3>
+        <div style="width:80%;margin: auto auto 20px auto">
+            查看近七日Top7国家
+            <select id="select_3D" onchange="get3DDataByAjax()">
+                <option value="addNumTopSeven">新增</option>
+                <option value="countNumTopSeven">累积</option>
+                <option value="cureNumTopSeven">已治愈</option>
+                <option value="deathNumTopSeven">死亡</option>
+            </select>
+            患者人数三维图
+        </div>
+
+        <!-- 为ECharts准备一个具备大小（宽高）的Dom 显示三维视图-->
+        <div id="main2" style="width:1200px;height:600px;margin: auto;"></div>
+
+        <script type="text/javascript">
+            // 基于准备好的dom，初始化echarts实例
+            let myChart2 = echarts.init(document.getElementById('main2'));
+            myChart2.showLoading();
+
+            let option2 = {
+                visualMap: {
+                    show: true,
+                    left: 'left',
+                    top: 'middle',
+                    pieces: [
+                        { gte: 0, label: '', color: '' },
+                        { gte: 0, lte: 0, label: '', color: '' },
+                        { gte: 0, lte: 0, label: '', color: '' },
+                        { gte: 0, lte: 0, label: '', color: '' },
+                        { lte: 0, label: '', color: '' }
+                      ]
+                },
+                xAxis3D: {
+                    type: 'category'
+                },
+                yAxis3D: {
+                    type: 'category'
+                },
+                zAxis3D: {
+                    type: 'value',
+                    max: 0,
+                    min: 0
+                },
+                grid3D: {
+                    axisLine: {
+                        lineStyle: { color: '#8A2BE2' }
+                    },
+                    axisPointer: {
+                        lineStyle: { color: '#D2691E' }
+                    },
+                    viewControl: {
+                        // autoRotate: true
+                    },
+                    light: {
+                        main: {
+                            shadow: true,
+                            quality: 'ultra',
+                            intensity: 1.5
+                        }
+                    }
+                },
+                series: [{
+                    type: 'bar3D',
+                    data: [],
+                    shading: 'lambert',
+                    label: {
+                        formatter: function (param) {
+                            return param.value[2].toFixed(1);
+                        }
+                    }
+                }]
+            };
+            myChart2.setOption(option2);
+
+            myChart2.hideLoading();
+        </script>
+    </body>
+</html>
