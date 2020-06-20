@@ -264,7 +264,7 @@
                     let date = date_now.getDate() < 10 ? "0"+date_now.getDate() : date_now.getDate();
                     //设置input标签的max属性
                     //alert(year+"-"+month+"-"+date);
-                    //$("#dateSelectTool").attr("max",year+"-"+month+"-"+date);
+                    $("#dateSelectTool").attr("max",year+"-"+month+"-"+date);
                     //设置input便签的默认选中的值
                     $("#dateSelectTool").attr("value",year+"-"+month+"-"+date);
                     //alert($("#dateSelectTool").val())
@@ -302,7 +302,7 @@
             <h1 style="text-align: center;color: OrangeRed">新冠肺炎全球实时数据</h1>
             <h2 style="text-align: right;color: DimGray">Made by MagicYang</h2>
             请选择要查询数据的日期:
-            <input type = 'date' id="dateSelectTool" min="2020-06-15" max="2020-06-21" onchange="dateChangeFun();"/>
+            <input type = 'date' id="dateSelectTool" min="2020-06-15" onchange="dateChangeFun();"/>
             <br><br>
             查看
             <select id="select_top10" onchange="getAllDataByAjax(0)">

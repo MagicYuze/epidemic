@@ -164,7 +164,7 @@ def getTopSevenData(request):
         syncDataBase(request)
 
     # 测试用
-    endDate = '2020-06-21'
+    # endDate = '2020-06-21'
     # 查询七天的所有记录
     searchData = models.EpidemicInfo.objects.filter(date__range=(startDate, endDate))
 
